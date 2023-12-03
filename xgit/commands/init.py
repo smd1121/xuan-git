@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import typer
 from typer import Argument
 from typing_extensions import Annotated
 
@@ -23,4 +24,4 @@ def init(directory: Annotated[str, Argument(help="要初始化 git 仓库的目�
         with (git_dir / "HEAD").open("w") as f:
             f.write("ref: refs/heads/master\n")
 
-    print(f"Initialized empty Git repository in {git_dir.absolute()}")
+    typer.echo(f"Initialized empty Git repository in {git_dir.absolute()}")
