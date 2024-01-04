@@ -6,8 +6,8 @@ import typer
 from typer import Option, Argument
 from typing_extensions import Annotated
 
-from xgit.types import Factory
-from xgit.utils import check_exist, get_file_path
+from xgit.types.types import Factory
+from xgit.utils.utils import check_exist, get_file_path
 
 
 def cat_file(

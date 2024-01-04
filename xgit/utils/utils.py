@@ -3,7 +3,7 @@ from pathlib import Path
 
 import typer
 
-from xgit.constants import GIT_DIR
+from xgit.utils.constants import GIT_DIR
 
 
 def find_repo() -> Path:

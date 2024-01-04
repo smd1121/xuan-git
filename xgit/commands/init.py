@@ -4,7 +4,7 @@ import typer
 from typer import Argument
 from typing_extensions import Annotated
 
-from xgit.constants import GIT_DIR
+from xgit.utils.constants import GIT_DIR
 
 
 def init(directory: Annotated[str, Argument(help="要初始化 git 仓库的目录")] = "."):

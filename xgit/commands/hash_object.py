@@ -7,8 +7,8 @@ import typer
 from typer import Option, Argument
 from typing_extensions import Annotated
 
-from xgit.utils import find_repo
-from xgit.constants import GIT_DIR
+from xgit.utils.utils import find_repo
+from xgit.utils.constants import GIT_DIR
 
 
 def hash_object(
