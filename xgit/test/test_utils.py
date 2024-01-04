@@ -61,7 +61,8 @@ def check_same_output(cmd: list[str]) -> bool:
 
     if git_result.stdout != xgit_stdout:
         logger.info(f"cmd: {cmd}")
-        logger.info(f"stdout not equal: {git_result.stdout} != {xgit_stdout}")
+        logger.info(f"stdout not equal: {git_result.stdout!r}\n!=\n{xgit_stdout!r}")
+        logger.info(f"stdout not equal: {git_result.stdout.decode()}\n!=\n{xgit_stdout.decode()}")
         return False
 
     return True

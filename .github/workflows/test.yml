@@ -23,6 +23,5 @@ jobs:
 
       - name: Run tests
         run: |
-          cd xgit
-          coverage run -m pytest .
+          coverage run -m pytest xgit
           coverage report -m
