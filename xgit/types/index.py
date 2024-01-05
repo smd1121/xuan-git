@@ -1,7 +1,7 @@
 import hashlib
 from typing import Optional
 
-from xgit.utils.utils import find_repo, get_repo_file
+from xgit.utils.utils import find_repo, get_repo_file, timestamp_to_str
 from xgit.types.metadata import Metadata
 from xgit.utils.constants import GIT_DIR
 
@@ -59,6 +59,12 @@ class IndexEntry:
             data |= (self.stage << 12) & 0x3000
             data |= self.name_length
             return data.to_bytes(2, "big")
+
+        def __rich_repr__(self):
+            yield "assume_valid", self.assume_valid
+            yield "extended", self.extended
+            yield "stage", self.stage
+            yield "name_length", self.name_length
 
     metadata: Metadata
     sha: str
@@ -171,6 +177,23 @@ class IndexEntry:
 
         return entry
 
+    # 以下用于 show-index 输出
+
+    verbose: bool = False
+
+    def __rich_repr__(self):
+        if not self.verbose:
+            yield "file_name", self.file_name
+            yield "ctime", timestamp_to_str(self.metadata.ctime_s, self.metadata.ctime_ns)
+            yield "mtime", timestamp_to_str(self.metadata.mtime_s, self.metadata.mtime_ns)
+            yield "sha", self.sha
+        else:
+            yield "metadata", self.metadata
+            yield "sha", self.sha
+            yield "flags", self.flags
+            yield "extended_flags", self.extended_flags
+            yield "file_name", self.file_name
+
 
 class Index:
     version: int
@@ -202,6 +225,12 @@ class Index:
         index += self.extensions
         index += hashlib.sha1(index).digest()
         return index
+
+    def __rich_repr__(self):
+        yield "version", self.version
+        yield "entry_count", self.entry_count
+        yield "entries", self.entries
+        yield "extensions", self.extensions
 
 
 def get_index() -> Index:
