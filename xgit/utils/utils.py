@@ -1,4 +1,5 @@
 import sys
+import datetime
 from pathlib import Path
 
 import typer
@@ -39,3 +40,10 @@ def get_object(obj: str):
 def check_exist(obj: str) -> bool:
     object_file = get_object(obj)
     return object_file.exists()
+
+
+def timestamp_to_str(time_s, time_ns):
+    dt = datetime.datetime.fromtimestamp(time_s)
+    microseconds = time_ns // 1000
+    dt = dt + datetime.timedelta(microseconds=microseconds)
+    return dt.strftime("%Y-%m-%d %H:%M:%S.%f")
