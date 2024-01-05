@@ -1,7 +1,10 @@
 import hashlib
+from enum import Enum
 from typing import Optional
+from pathlib import Path
 
-from xgit.utils.utils import find_repo, get_repo_file, timestamp_to_str
+from xgit.utils.sha import hash_file
+from xgit.utils.utils import find_repo, get_repo_file, timestamp_to_str, get_file_path_in_repo
 from xgit.types.metadata import Metadata
 from xgit.utils.constants import GIT_DIR
 
@@ -85,6 +88,25 @@ class IndexEntry:
         self.flags = flags
         self.extended_flags = extended_flags
         self.file_name = file_name
+
+    @staticmethod
+    def from_file(f: Path) -> "IndexEntry":
+        metadata = Metadata.get_metadata(f)
+        sha = hash_file(str(f))
+        flags = IndexEntry.Flag(False, False, 0, len(f.name))
+        extended_flags = None
+        file_name = str(get_file_path_in_repo(f))
+        return IndexEntry(metadata, sha, flags, extended_flags, file_name)
+
+    @staticmethod
+    def from_cache_info(mode: str, obj: str, path: str) -> "IndexEntry":
+        # example: 100644,e69de29bb2d1d6434b8b29ae775ad8c2e48c5391,a
+        metadata = Metadata.from_cache_info(get_repo_file(path), int(mode, base=8))
+        sha = obj
+        flags = IndexEntry.Flag(False, False, 0, len(path))
+        extended_flags = None
+        file_name = path
+        return IndexEntry(metadata, sha, flags, extended_flags, file_name)
 
     @staticmethod
     def parse(data: bytes) -> tuple["IndexEntry", bytes]:
@@ -171,6 +193,30 @@ class IndexEntry:
 
         return entry
 
+    class IndexEntryStatus(Enum):
+        UP_TO_DATE = 0
+        NEEDS_UPDATE = 1
+
+    def refresh(self) -> IndexEntryStatus:
+        """
+        执行 update-index --refresh
+        """
+        f = get_repo_file(self.file_name)
+
+        if not f.exists():
+            return IndexEntry.IndexEntryStatus.NEEDS_UPDATE
+
+        metadata = Metadata.get_metadata(f)
+        if metadata == self.metadata:
+            return IndexEntry.IndexEntryStatus.UP_TO_DATE
+
+        sha = hash_file(str(f))
+        if sha != self.sha:
+            return IndexEntry.IndexEntryStatus.NEEDS_UPDATE
+
+        self.metadata = metadata
+        return IndexEntry.IndexEntryStatus.UP_TO_DATE
+
     # 以下用于 show-index 输出
 
     verbose: bool = False
@@ -191,22 +237,24 @@ class IndexEntry:
 
 class Index:
     version: int
-    entry_count: int
     entries: list[IndexEntry]
     extensions: bytes
+
+    @property
+    def entry_count(self):
+        return len(self.entries)
 
     def __init__(self, data: Optional[bytes] = None):
         if data is None:
             self.version = 2
-            self.entry_count = 0
             self.entries = []
             self.extensions = b""
         else:
             self.version = int.from_bytes(data[4:8], "big")
-            self.entry_count = int.from_bytes(data[8:12], "big")
+            entry_count = int.from_bytes(data[8:12], "big")
             self.entries = []
             data = data[12:]
-            for _ in range(self.entry_count):
+            for _ in range(entry_count):
                 entry, data = IndexEntry.parse(data)
                 self.entries.append(entry)
             self.extensions = data[:-20]
@@ -220,11 +268,67 @@ class Index:
         index += hashlib.sha1(index).digest()
         return index
 
+    def write(self):
+        with open(find_repo() / GIT_DIR / "index", "wb") as f:
+            f.write(self.to_bytes())
+
     def __rich_repr__(self):
         yield "version", self.version
         yield "entry_count", self.entry_count
         yield "entries", self.entries
         yield "extensions", self.extensions
+
+    def entry_paths(self) -> list[str]:
+        return [e.file_name for e in self.entries]
+
+    def refresh(self) -> list[str]:
+        """
+        执行 update-index --refresh，返回需要 update 的文件名
+        """
+        needs_update = []
+        for entry in self.entries:
+            if entry.refresh() == IndexEntry.IndexEntryStatus.NEEDS_UPDATE:
+                needs_update.append(entry.file_name)
+        return needs_update
+
+    def update_or_add(self, entry: IndexEntry, add_if_absent: bool) -> bool:
+        """
+        假设 entries 有序
+        返回是否做了 update / add
+        """
+        for i, e in enumerate(self.entries):
+            if e.file_name == entry.file_name:
+                self.entries[i] = entry
+                return True
+            if e.file_name > entry.file_name:
+                if add_if_absent:
+                    self.entries.insert(i, entry)
+                    return True
+                return False
+
+        if add_if_absent:
+            self.entries.append(entry)
+            return True
+        return False
+
+    def update(self, file: Path, add_if_absent: bool) -> bool:
+        entry = IndexEntry.from_file(file)
+        return self.update_or_add(entry, add_if_absent)
+
+    def add_cacheinfo(self, mode: str, obj: str, path: str):
+        entry = IndexEntry.from_cache_info(mode, obj, path)
+        assert self.update_or_add(entry, True), "--add --cacheinfo should not fail here"
+
+    def remove(self, file: Path) -> bool:
+        """
+        返回是否成功删除
+        """
+        file_name = get_file_path_in_repo(file)
+        for i, e in enumerate(self.entries):
+            if e.file_name == file_name:
+                self.entries.pop(i)
+                return True
+        return False
 
 
 def get_index() -> Index:

@@ -29,6 +29,14 @@ def get_repo_file(f: str) -> Path:
     return (find_repo() / f).resolve()
 
 
+def get_file_path_in_repo(f: Path) -> str:
+    """
+    `f` 是本地实际路径，返回相对于 repo 的路径
+    """
+    repo = find_repo()
+    return str(f.resolve().relative_to(repo))
+
+
 def get_object(obj: str):
     """
     给定一个 object 的 ID (sha)，返回它在 objects 中的路径
