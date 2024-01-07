@@ -1,13 +1,13 @@
 import sys
-import zlib
 from typing import Optional
 
 import typer
 from typer import Option, Argument
 from typing_extensions import Annotated
 
+from xgit.utils.sha import extract_data
 from xgit.types.types import Factory
-from xgit.utils.utils import get_object, check_exist
+from xgit.utils.utils import check_exist
 
 
 def cat_file(
@@ -57,8 +57,7 @@ def cat_file(
         typer.echo(f"fatal: Not a valid obj name {obj}", err=True)
         sys.exit(128)
 
-    with get_object(obj=obj).open("rb") as f:
-        data = zlib.decompress(f.read())
+    data = extract_data(object_id=obj)
 
     hdr, data = data.split(b"\x00", maxsplit=1)
     type_, size = hdr.split(b" ", maxsplit=1)
